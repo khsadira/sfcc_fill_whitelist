@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"net/url"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,11 +10,11 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 )
-
 
 func reworkID(id string) string {
 	id = url.QueryEscape(id)
@@ -64,7 +63,7 @@ func getToken(clientID string, clientPW string) (string, error) {
 
 func reworkSiteID(sheetID string) []string {
 	if sheetID == "GLOBAL" {
-		return []string {
+		return []string{
 			"ie_uplaypc",
 			"jp_ubisoft",
 			"eu_ubisoft",
@@ -153,7 +152,7 @@ const host = "dev26-ubisoftstore-ubisoft.demandware.net"
 
 /*
 	SFCC CONNECTION
- */
+*/
 
 func querySfcc(method string, query string, auth string, token string, body []byte) ([]byte, error) {
 	client := &http.Client{}
@@ -165,19 +164,15 @@ func querySfcc(method string, query string, auth string, token string, body []by
 	}
 
 	if auth == "Bearer" {
-		req.Header.Add("Authorization", "Bearer " + token)
+		req.Header.Add("Authorization", "Bearer "+token)
 		if body != nil {
 			req.Header.Add("Content-Type", "application/json")
 		}
 	} else if auth == "Basic" {
-		req.Header.Add("Authorization", "Basic " + token)
+		req.Header.Add("Authorization", "Basic "+token)
 	}
 
 	resp, err := client.Do(req)
-
-	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return nil, errors.New(resp.Status)
-	}
 
 	if err != nil {
 		log.Println(err)
@@ -185,8 +180,12 @@ func querySfcc(method string, query string, auth string, token string, body []by
 	}
 
 	defer resp.Body.Close()
-	buf, _ := ioutil.ReadAll(resp.Body)
 
+	if resp.StatusCode != 200 && resp.StatusCode != 204 {
+		return nil, errors.New(resp.Status)
+	}
+
+	buf, _ := ioutil.ReadAll(resp.Body)
 	return buf, err
 }
 
@@ -197,7 +196,7 @@ func whitelistPromotions(queryURL string, campaignID string, token string, ch ch
 	respBody, err := querySfcc("POST", queryPromoAssignmentUrl, "Bearer", token, []byte(body))
 
 	if err != nil {
-		log.Println("getPromo:" + campaignID + ":", err)
+		log.Println("getPromo:"+campaignID+":", err)
 		log.Println(queryPromoAssignmentUrl)
 		ch <- true
 		return
@@ -218,7 +217,7 @@ func whitelistPromotions(queryURL string, campaignID string, token string, ch ch
 		_, err := querySfcc("PATCH", queryPromoURI, "Bearer", token, []byte(`{"c_soc_whitelist": true}`))
 
 		if err != nil {
-			log.Println("Patch Promo:" + hit.PromotionID + ":", err)
+			log.Println("Patch Promo:"+hit.PromotionID+":", err)
 			log.Println(queryPromoURI)
 
 			ch <- true
@@ -239,7 +238,7 @@ func whitelistSO(siteID string, campaignID string, token string) {
 	respBody, err := querySfcc("PATCH", queryCampaignURL, "Bearer", token, []byte(`{"c_soc_whitelist": true}`))
 
 	if err != nil {
-		println("Patch Campaign:" + campaignID + ":", err)
+		println("Patch Campaign:"+campaignID+":", err)
 		log.Println(queryCampaignURL)
 
 		return
@@ -264,16 +263,16 @@ func whitelistSO(siteID string, campaignID string, token string) {
 		_, err = querySfcc("PATCH", queryCouponURI, "Bearer", token, []byte(`{"c_soc_whitelist": true}`))
 
 		if err != nil {
-			log.Println("Patch Coupon:" + couponID + ":", err)
+			log.Println("Patch Coupon:"+couponID+":", err)
 			log.Println(queryCouponURI)
 
 			return
 		}
 
-		println("COUPON:\t\t"+couponID)
+		println("COUPON:\t\t" + couponID)
 	}
-	for i := 0 ; i < 1; i++ {
-		<- ch
+	for i := 0; i < 1; i++ {
+		<-ch
 	}
 }
 
@@ -299,19 +298,17 @@ func main() {
 
 	sheetsMap := f.GetSheetMap()
 	for _, sheetID := range sheetsMap {
-		if sheetID == "FR" || sheetID == "US" {
-			siteIDs := reworkSiteID(sheetID)
-			rows := f.GetRows(sheetID)
-			for _, row := range rows {
-				for _, campaignID := range row {
-					for _, siteID := range siteIDs {
-						println("____SITE:" + siteID + "____")
-						whitelistSO(siteID, campaignID, token)
-						println()
-					}
+		siteIDs := reworkSiteID(sheetID)
+		rows := f.GetRows(sheetID)
+		for _, row := range rows {
+			for _, campaignID := range row {
+				for _, siteID := range siteIDs {
+					println("____SITE:" + siteID + "____")
+					whitelistSO(siteID, campaignID, token)
+					println()
 				}
-				println()
 			}
+			println()
 		}
 	}
 }
